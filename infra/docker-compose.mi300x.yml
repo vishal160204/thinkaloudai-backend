@@ -31,7 +31,6 @@ services:
       --enable-prefix-caching
       --max-num-seqs 16
       --trust-remote-code
-      --chat-template-kwargs '{"enable_thinking": false}'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
