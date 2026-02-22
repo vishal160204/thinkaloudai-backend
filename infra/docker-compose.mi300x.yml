@@ -1,0 +1,148 @@
+version: "3.9"
+
+# MI300X GPU Services — ThinkAloud.ai
+# All models served via vLLM with ROCm. Thinking mode disabled on Qwen3.
+
+services:
+  # --- LLM: Qwen3-32B (dense, 32B params) ---
+  vllm-llm:
+    image: vllm/vllm-openai:latest-rocm
+    container_name: vllm-llm
+    restart: unless-stopped
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    ipc: host
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    command: >
+      --model Qwen/Qwen3-32B
+      --dtype bfloat16
+      --max-model-len 8192
+      --gpu-memory-utilization 0.50
+      --enable-chunked-prefill
+      --enable-prefix-caching
+      --max-num-seqs 16
+      --trust-remote-code
+      --chat-template-kwargs '{"enable_thinking": false}'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # --- STT: Voxtral Realtime 4B ---
+  vllm-stt:
+    image: vllm/vllm-openai:latest-rocm
+    container_name: vllm-stt
+    restart: unless-stopped
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    ipc: host
+    ports:
+      - "8001:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    command: >
+      --model mistralai/Voxtral-Realtime-4B
+      --dtype bfloat16
+      --max-model-len 4096
+      --gpu-memory-utilization 0.08
+      --trust-remote-code
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # --- TTS: Qwen3-TTS-1.7B ---
+  vllm-tts:
+    image: vllm/vllm-openai:latest-rocm
+    container_name: vllm-tts
+    restart: unless-stopped
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    ipc: host
+    ports:
+      - "8002:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    command: >
+      --model Qwen/Qwen3-TTS-12Hz-1.7B
+      --dtype bfloat16
+      --gpu-memory-utilization 0.05
+      --trust-remote-code
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # --- LiveKit SFU Server ---
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit-server
+    restart: unless-stopped
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+    command: --config /etc/livekit.yaml
+
+  # --- Qdrant Vector DB (for Mem0 memory) ---
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+
+  # --- Voice Agent Worker ---
+  voice-agent:
+    build:
+      context: ../voice-agent
+      dockerfile: Dockerfile
+    container_name: voice-agent
+    restart: unless-stopped
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-thinkaloud_key}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-thinkaloud_secret_change_in_production}
+      MI300X_URL: http://host.docker.internal
+      VLLM_LLM_PORT: "8000"
+      VLLM_STT_PORT: "8001"
+      VLLM_TTS_PORT: "8002"
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      LLM_MODEL: Qwen/Qwen3-32B
+      STT_MODEL: mistralai/Voxtral-Realtime-4B
+      TTS_MODEL: Qwen/Qwen3-TTS-12Hz-1.7B
+    depends_on:
+      - livekit
+      - qdrant
+
+volumes:
+  qdrant_data:

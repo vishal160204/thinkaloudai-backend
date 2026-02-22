@@ -1,0 +1,9 @@
+port: 7880
+rtc:
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+keys:
+  thinkaloud_key: thinkaloud_secret_change_in_production
+logging:
+  level: info

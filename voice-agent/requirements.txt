@@ -1,0 +1,6 @@
+livekit-agents>=1.0.0
+livekit-plugins-openai>=1.0.0
+livekit-plugins-silero>=1.0.0
+livekit-plugins-turn-detector>=1.0.0
+mem0ai>=0.1.0
+qdrant-client>=1.12.0

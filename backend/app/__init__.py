@@ -1,0 +1,1 @@
+"""ThinkAloud.ai Backend Application"""

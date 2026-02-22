@@ -1,0 +1,85 @@
+name: CI/CD — ThinkAloud.ai Backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  # --- Lint ---
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          uv sync
+
+      - name: Run Ruff linter
+        run: |
+          cd backend
+          uv run ruff check app/ --exit-zero
+
+      - name: Run Ruff formatter
+        run: |
+          cd backend
+          uv run ruff format --check app/ --exit-zero
+
+  # --- Deploy to MI300X Droplet ---
+  deploy:
+    runs-on: ubuntu-latest
+    needs: lint
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            echo "🚀 Deploying ThinkAloud.ai Backend..."
+
+            # Navigate to project
+            cd /root/ThinkAloud.ai || {
+              echo "📦 First deploy — cloning repo..."
+              cd /root
+              git clone https://github.com/${{ github.repository }}.git ThinkAloud.ai
+              cd ThinkAloud.ai
+            }
+
+            # Pull latest code
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Install/update deps
+            cd backend
+            ~/.local/bin/uv sync
+
+            # Run migrations
+            ~/.local/bin/uv run alembic upgrade head
+
+            # Restart backend service
+            sudo systemctl restart thinkaloud || {
+              echo "⚠️ Service not found — creating it..."
+              sudo cp /root/ThinkAloud.ai/infra/thinkaloud.service /etc/systemd/system/
+              sudo systemctl daemon-reload
+              sudo systemctl enable thinkaloud
+              sudo systemctl start thinkaloud
+            }
+
+            echo "✅ Deploy complete!"
+            sudo systemctl status thinkaloud --no-pager
