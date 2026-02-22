@@ -1,12 +1,10 @@
-version: "3.9"
-
 # MI300X GPU Services — ThinkAloud.ai
 # All models served via vLLM with ROCm. Thinking mode disabled on Qwen3.
 
 services:
   # --- LLM: Qwen3-32B (dense, 32B params) ---
   vllm-llm:
-    image: vllm/vllm-openai:latest-rocm
+    image: rocm/vllm:latest
     container_name: vllm-llm
     restart: unless-stopped
     devices:
@@ -42,7 +40,7 @@ services:
 
   # --- STT: Voxtral Realtime 4B ---
   vllm-stt:
-    image: vllm/vllm-openai:latest-rocm
+    image: rocm/vllm:latest
     container_name: vllm-stt
     restart: unless-stopped
     devices:
@@ -70,7 +68,7 @@ services:
 
   # --- TTS: Qwen3-TTS-1.7B ---
   vllm-tts:
-    image: vllm/vllm-openai:latest-rocm
+    image: rocm/vllm:latest
     container_name: vllm-tts
     restart: unless-stopped
     devices:

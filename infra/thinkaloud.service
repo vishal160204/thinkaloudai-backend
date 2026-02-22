@@ -4,11 +4,11 @@ After=network.target postgresql.service redis.service
 
 [Service]
 User=root
-WorkingDirectory=/root/ThinkAloud.ai/backend
+WorkingDirectory=/root/thinkaloudai-backend/backend
 ExecStart=/root/.local/bin/uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 4
 Restart=always
 RestartSec=5
-EnvironmentFile=/root/ThinkAloud.ai/backend/.env
+EnvironmentFile=/root/thinkaloudai-backend/backend/.env
 
 [Install]
 WantedBy=multi-user.target
